@@ -1,0 +1,27 @@
+service ROSBridge
+
+
+struct time
+    field int32 secs
+    field int32 nsecs
+end struct
+
+
+struct duration
+    field int32 secs
+    field int32 nsecs
+end struct
+
+
+object ROSBridgeManager
+    function int32 subscribe (string topic, string msgtype)
+    objref varobject{int32} subscribers
+    function int32 publish (string topic, string msgtype)
+    objref varobject{int32} publishers
+    function int32 client (string service, string srvtype)
+    objref varobject{int32} clients
+    function int32 regservice (string service, string srvtype)
+    objref varobject{int32} services
+end object
+
+
