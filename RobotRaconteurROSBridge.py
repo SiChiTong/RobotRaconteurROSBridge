@@ -3,14 +3,14 @@
 #                     Wason Technology, LLC
 #
 #  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
+#  it under the terms of the GNU Lesser General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
 #  (at your option) any later version.
 #
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+#  GNU Lesser General Public License for more details.
 #
 #  You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -99,6 +99,8 @@ class ros2rr_class(object):
     def __call__(self,i):
         return self.func(i,self.adapters)
     
+
+
 
 class ROSTypeAdapterManager(object):
 
@@ -217,7 +219,17 @@ class ROSTypeAdapterManager(object):
             
     def _generateAdapters(self,rostype,rrtype,messagename,slot_types,slots,rosmsgtype):
         
-        __primtypes__=["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float32", "float64", "bool" ]
+        def fixname(name):
+            rr_reserved=["object","end","option","service","object","struct","import","implements","field","property","function","event","objref","pipe","callback","wire","memory","void","int8","uint8","int16","uint16","int32","uint32","int64","uint64","single","double","varvalue","varobject","exception"]
+            if (name in rr_reserved):
+                return "ros" + name
+            if (name.lower().startswith("rr") or name.lower().startswith("robotraconteur")):
+                return "ros" + name
+            return name
+        
+        rrslots=[fixname(s) for s in slots]
+        
+        __primtypes__=["byte", "char", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "float32", "float64", "bool" ]
         
         rrtype_entry=RR.ServiceEntryDefinition(rrtype)
         rrtype_entry.Name=messagename
@@ -249,16 +261,18 @@ class ROSTypeAdapterManager(object):
                 if (slot_type=='float32'): slot_type2='single'
                 if (slot_type=='float64'): slot_type2='double'
                 if (slot_type=='bool'): slot_type2='uint8'
+                if (slot_type=='byte'): slot_type2='int8'
+                if (slot_type=='char'): slot_type2='uint8'
                 
                 t=RR.TypeDefinition()
-                t.Name=slots[i]
+                t.Name=rrslots[i]
                 t.Type=RR.TypeDefinition.DataTypeFromString(slot_type2)
                 t.IsArray=isarray
                 t.Length=arrlength
                 t.VarLength=not arrfixed
                 
                 field=RR.PropertyDefinition(rrtype_entry)
-                field.Name=slots[i]
+                field.Name=rrslots[i]
                 field.Type=t
                 
                 t.SetMember(field)
@@ -266,20 +280,20 @@ class ROSTypeAdapterManager(object):
                 rrtype_entry.Members.append(field)
                 
                 if (isarray and arrfixed):
-                    rr2ros_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
+                    rr2ros_str+="\tif (len(i." + rrslots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                     ros2rr_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                 if (not ((slot_type=='int8' or slot_type=='uint8') and isarray)):
-                    rr2ros_str+="\to." + slots[i] + "=i." + slots[i] + "\n"
-                    ros2rr_str+="\to." + slots[i] + "=i." + slots[i] + "\n"
+                    rr2ros_str+="\to." + slots[i] + "=i." + rrslots[i] + "\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=i." + slots[i] + "\n"
                 else:
-                    rr2ros_str+="\to." + slots[i] + "=i." + slots[i] + "\n"
-                    ros2rr_str+="\to." + slots[i] + "=bytearray(i." + slots[i] + ")\n"
+                    rr2ros_str+="\to." + slots[i] + "=i." + rrslots[i] + "\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=bytearray(i." + slots[i] + ")\n"
             
             
             
             elif (slot_type=='string'):
                 t=RR.TypeDefinition()
-                t.Name=slots[i]
+                t.Name=rrslots[i]
                 t.Type=RR.DataTypes_string_t
                 t.IsList=isarray
                 if (isarray):
@@ -288,7 +302,7 @@ class ROSTypeAdapterManager(object):
                     t.VarLength=not arrfixed
                 
                 field=RR.PropertyDefinition(rrtype_entry)
-                field.Name=slots[i]
+                field.Name=rrslots[i]
                 field.Type=t
                 
                 t.SetMember(field)
@@ -296,20 +310,20 @@ class ROSTypeAdapterManager(object):
                 rrtype_entry.Members.append(field)
                 
                 if (isarray and arrfixed):
-                    rr2ros_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
+                    rr2ros_str+="\tif (len(i." + rrslots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                     ros2rr_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                 if (not isarray):
-                    rr2ros_str+="\to." + slots[i] + "=i." + slots[i] + "\n"
-                    ros2rr_str+="\to." + slots[i] + "=i." + slots[i] + "\n"
+                    rr2ros_str+="\to." + slots[i] + "=i." + rrslots[i] + "\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=i." + slots[i] + "\n"
                 else:
-                    rr2ros_str+="\to." + slots[i] + "=(i." + slots[i] + ")\n"
-                    ros2rr_str+="\to." + slots[i] + "=(i." + slots[i] + ")\n"
+                    rr2ros_str+="\to." + slots[i] + "=(i." + rrslots[i] + ")\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=(i." + slots[i] + ")\n"
             
             elif (slot_type=='time' or slot_type=='duration'):
                 if (not 'RobotRaconteurROSBridge' in rrtype.Imports): 
                     rrtype.Imports.append('ROSBridge')
                 t=RR.TypeDefinition()
-                t.Name=slots[i]
+                t.Name=rrslots[i]
                 t.Type=RR.DataTypes_structure_t
                 if (slot_type=='time'): t.TypeString='ROSBridge.time'
                 if (slot_type=='duration'): t.TypeString='ROSBridge.duration'
@@ -320,7 +334,7 @@ class ROSTypeAdapterManager(object):
                     t.VarLength=not arrfixed
                 
                 field=RR.PropertyDefinition(rrtype_entry)
-                field.Name=slots[i]
+                field.Name=rrslots[i]
                 field.Type=t
                 
                 t.SetMember(field)
@@ -328,23 +342,23 @@ class ROSTypeAdapterManager(object):
                 rrtype_entry.Members.append(field)
             
                 if (isarray and arrfixed):
-                    rr2ros_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
+                    rr2ros_str+="\tif (len(i." + rrslots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                     ros2rr_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                 if (slot_type=='time'):
                     if (not isarray):
-                        rr2ros_str+="\to." + slots[i] + "=_rr2ros_time(i." + slots[i] + ")\n"
-                        ros2rr_str+="\to." + slots[i] + "=_ros2rr_time(i." + slots[i] + ")\n"
+                        rr2ros_str+="\to." + slots[i] + "=_rr2ros_time(i." + rrslots[i] + ")\n"
+                        ros2rr_str+="\to." + rrslots[i] + "=_ros2rr_time(i." + slots[i] + ")\n"
                     else:
-                        rr2ros_str+="\to." + slots[i] + "=(i." + slots[i] + ",_rr2ros_time)\n"
-                        ros2rr_str+="\to." + slots[i] + "=(i." + slots[i] + ",_ros2rr_time)\n"
+                        rr2ros_str+="\to." + slots[i] + "=(i." + rrslots[i] + ",_rr2ros_time)\n"
+                        ros2rr_str+="\to." + rrslots[i] + "=(i." + slots[i] + ",_ros2rr_time)\n"
             
                 if (slot_type=='duration'):
                     if (not isarray):
-                        rr2ros_str+="\to." + slots[i] + "=_rr2ros_duration(i." + slots[i] + ")\n"
-                        ros2rr_str+="\to." + slots[i] + "=_ros2rr_duration(i." + slots[i] + ")\n"
+                        rr2ros_str+="\to." + slots[i] + "=_rr2ros_duration(i." + rrslots[i] + ")\n"
+                        ros2rr_str+="\to." + rrslots[i] + "=_ros2rr_duration(i." + slots[i] + ")\n"
                     else:
-                        rr2ros_str+="\to." + slots[i] + "=(i." + slots[i] + ",_rr2ros_duration)\n"
-                        ros2rr_str+="\to." + slots[i] + "=(i." + slots[i] + ",_ros2rr_duration)\n"
+                        rr2ros_str+="\to." + slots[i] + "=(i." + rrslots[i] + ",_rr2ros_duration)\n"
+                        ros2rr_str+="\to." + rrslots[i] + "=(i." + slots[i] + ",_ros2rr_duration)\n"
             
             elif ('/' in slot_type):
                 
@@ -357,7 +371,7 @@ class ROSTypeAdapterManager(object):
                 if (not rripackagename in rrtype.Imports): 
                     rrtype.Imports.append(rripackagename)
                 t=RR.TypeDefinition()
-                t.Name=slots[i]
+                t.Name=rrslots[i]
                 t.Type=RR.DataTypes_structure_t
                 t.TypeString=rripackagename + "." + imessage
                 t.IsList=isarray
@@ -367,7 +381,7 @@ class ROSTypeAdapterManager(object):
                     t.VarLength=not arrfixed
                 
                 field=RR.PropertyDefinition(rrtype_entry)
-                field.Name=slots[i]
+                field.Name=rrslots[i]
                 field.Type=t
                 
                 t.SetMember(field)
@@ -375,17 +389,20 @@ class ROSTypeAdapterManager(object):
                 rrtype_entry.Members.append(field)
                 
                 if (isarray and arrfixed):
-                    rr2ros_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
+                    rr2ros_str+="\tif (len(i." + rrslots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                     ros2rr_str+="\tif (len(i." + slots[i] + ")!=" + str(arrlength) + "): raise Exception('Invalid length')\n"
                 if (not isarray):
-                    rr2ros_str+="\to." + slots[i] + "=adapters['"+ slot_type +"'].rr2ros(i." + slots[i] + ")\n"
-                    ros2rr_str+="\to." + slots[i] + "=adapters['"+ slot_type +"'].ros2rr(i." + slots[i] + ")\n"
+                    rr2ros_str+="\to." + slots[i] + "=adapters['"+ slot_type +"'].rr2ros(i." + rrslots[i] + ")\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=adapters['"+ slot_type +"'].ros2rr(i." + slots[i] + ")\n"
                 else:
-                    rr2ros_str+="\to." + slots[i] + "=[adapters['"+ slot_type +"'].rr2ros(d) for d in (i." + slots[i] + ")]\n"
-                    ros2rr_str+="\to." + slots[i] + "=[adapters['"+ slot_type +"'].ros2rr(d) for d in (i." + slots[i] + ")]\n"
+                    rr2ros_str+="\to." + slots[i] + "=[adapters['"+ slot_type +"'].rr2ros(d) for d in (i." + rrslots[i] + ")]\n"
+                    ros2rr_str+="\to." + rrslots[i] + "=[adapters['"+ slot_type +"'].ros2rr(d) for d in (i." + slots[i] + ")]\n"
             
             else:
-                raise Exception("Cannot convert message type " + rostype._type)
+                if (hasattr(rostype,"_type")):
+                    raise Exception("Cannot convert message type " + rostype._type)
+                else:
+                    raise Exception("Cannot convert message type " + str(rostype))
         
         rr2ros_str+="\treturn o"
         ros2rr_str+="\treturn o"
